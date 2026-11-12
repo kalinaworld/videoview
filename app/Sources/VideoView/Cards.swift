@@ -27,12 +27,14 @@ struct ClipCard: View {
     let width: CGFloat
     @State private var poster: NSImage?
     @State private var hoverFraction: Double?
+    @State private var hovering = false
 
     private var selected: Bool { lib.selection.contains(clip.path) }
     private var version: Int { lib.thumbVersion[clip.cid] ?? 0 }
+    private var isMinimal: Bool { lib.viewMode == .minimal }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: isMinimal ? 0 : 5) {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
                     Color.black
@@ -44,10 +46,22 @@ struct ClipCard: View {
                         ProgressView().controlSize(.small)
                     }
                     if let f = hoverFraction {
-                        // scrub position bar
                         GeometryReader { g in
-                            Rectangle().fill(Color.accentColor).frame(width: g.size.width * f, height: 3)
+                            Rectangle().fill(Color.steel).frame(width: g.size.width * f, height: 3)
                                 .frame(maxHeight: .infinity, alignment: .bottom)
+                        }
+                    }
+                    // Minimal mode: filename fades in on hover
+                    if isMinimal && hovering {
+                        LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
+                        VStack {
+                            Spacer()
+                            Text(clip.name)
+                                .font(.caption2)
+                                .foregroundStyle(.white.opacity(0.85))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .padding(.horizontal, 6).padding(.bottom, 7)
                         }
                     }
                 }
@@ -57,6 +71,19 @@ struct ClipCard: View {
                             .padding(5)
                             .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 4))
                             .padding(5)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    // Info mode: resolution badge (sits below the flag if both present)
+                    if !isMinimal, let badge = resBadge {
+                        let hasFlag = lib.flagColors[clip.cid] != nil
+                        Text(badge.label)
+                            .font(.system(size: 9, weight: .semibold))
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(badge.color, in: RoundedRectangle(cornerRadius: 3))
+                            .foregroundStyle(badge.textColor)
+                            .padding(.leading, 5)
+                            .padding(.top, hasFlag ? 30 : 5)
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
@@ -72,22 +99,41 @@ struct ClipCard: View {
                 .contentShape(Rectangle())
                 .onContinuousHover { phase in
                     switch phase {
-                    case .active(let p): hoverFraction = min(max(p.x / max(geo.size.width, 1), 0), 0.9999)
-                    case .ended: hoverFraction = nil
+                    case .active(let p):
+                        hoverFraction = min(max(p.x / max(geo.size.width, 1), 0), 0.9999)
+                        hovering = true
+                    case .ended:
+                        hoverFraction = nil
+                        hovering = false
                     }
                 }
             }
             .aspectRatio(mediaAspect, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.accentColor : .clear, lineWidth: 3))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.steel : .clear, lineWidth: 3))
 
-            Text(clip.name).font(.callout).lineLimit(1).truncationMode(.middle)
-            if width >= 150 { Text(infoLine).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-            if !clip.camera.isEmpty && width >= 150 {
-                Text(clip.camera).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            if width >= 150, let savings = clip.savingsLabel {
-                Text(savings).font(.caption).foregroundStyle(.orange).lineLimit(1)
+            if !isMinimal {
+                Text(clip.name).font(.callout).lineLimit(1).truncationMode(.middle)
+                if width >= 150 {
+                    HStack(spacing: 6) {
+                        if let mbps = clip.bitrateMbps {
+                            Text(formatBitrate(mbps))
+                                .font(.caption.monospacedDigit())
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(bitrateColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 20))
+                                .foregroundStyle(bitrateColor)
+                        }
+                        Text(formatSize(clip.size))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if !clip.camera.isEmpty {
+                            Text("·").font(.caption).foregroundStyle(.tertiary)
+                            Text(clip.camera).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+                if width >= 150, let savings = clip.savingsLabel {
+                    Text(savings).font(.caption).foregroundStyle(.orange).lineLimit(1)
+                }
             }
         }
         .frame(width: width, alignment: .topLeading)
@@ -137,15 +183,24 @@ struct ClipCard: View {
         return poster
     }
 
-    private var infoLine: String {
-        var parts: [String] = []
-        let shot = formatShotDate(clip.sortDate)
-        if !shot.isEmpty { parts.append(shot) }
-        let res = resolutionLabel(clip.width, clip.height)
-        if !res.isEmpty { parts.append(res) }
-        if clip.fps > 0 { parts.append(String(format: "%g fps", (clip.fps * 100).rounded() / 100)) }
-        parts.append(formatSize(clip.size))
-        if let mbps = clip.bitrateMbps { parts.append(formatBitrate(mbps)) }
-        return parts.joined(separator: "  ·  ")
+    private struct ResBadge { let label: String; let color: Color; let textColor: Color }
+
+    private var resBadge: ResBadge? {
+        let long = max(clip.width, clip.height)
+        guard long > 0 else { return nil }
+        switch long {
+        case 5000...: return ResBadge(label: "6K", color: .steel, textColor: Color(white: 0.92))
+        case 3600...: return ResBadge(label: "4K", color: .white.opacity(0.18), textColor: .white)
+        case 1800...: return ResBadge(label: "1080p", color: .white.opacity(0.08), textColor: .secondary)
+        case 1...:    return ResBadge(label: resolutionLabel(clip.width, clip.height), color: .white.opacity(0.08), textColor: .secondary)
+        default:      return nil
+        }
+    }
+
+    private var bitrateColor: Color {
+        guard let mbps = clip.bitrateMbps else { return .secondary }
+        if mbps > 300 { return .steel }
+        if mbps > 80  { return Color(red: 0.8, green: 0.65, blue: 0.2) }
+        return .secondary
     }
 }

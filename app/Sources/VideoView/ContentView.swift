@@ -22,6 +22,7 @@ struct ContentView: View {
         } detail: {
             DetailView()
         }
+        .tint(.steel)
         .searchable(text: $lib.filter, placement: .toolbar, prompt: "Filter clips")
         .toolbar {
             ToolbarItem {
@@ -58,6 +59,16 @@ struct ContentView: View {
                 }
                 .help("Filter by flag color")
             }
+            ToolbarItem {
+                Picker("View", selection: $lib.viewMode) {
+                    ForEach(ViewMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .help("Toggle between Minimal and Info view (⌘I)")
+                .keyboardShortcut("i", modifiers: .command)
+            }
         }
         .sheet(item: $lib.playing) { clip in
             PlayerSheet(clip: clip)
@@ -84,7 +95,7 @@ struct SidebarView: View {
                             .lineLimit(1)
                             .padding(.vertical, 3).padding(.horizontal, 6)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 5).fill(current ? Color.accentColor : .clear))
+                            .background(RoundedRectangle(cornerRadius: 5).fill(current ? Color.steel : .clear))
                             .contentShape(Rectangle())
                             .onTapGesture { lib.open(root) }
                             .help(root)

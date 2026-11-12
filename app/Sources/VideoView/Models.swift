@@ -31,6 +31,16 @@ enum SortKey: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum ViewMode: String, CaseIterable, Identifiable {
+    case minimal = "Minimal"
+    case info = "Info"
+    var id: String { rawValue }
+}
+
+extension Color {
+    static let steel = Color(red: 78/255, green: 94/255, blue: 64/255)
+}
+
 func formatDuration(_ s: Double) -> String {
     guard s.isFinite, s >= 0 else { return "" }
     let t = Int(s.rounded())

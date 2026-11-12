@@ -36,6 +36,9 @@ final class Library {
     var flagFilter: FlagFilter = .off
     var flagged: Set<String> { Set(flagColors.keys) }
     var spaceSaverTarget: ClipRow? = nil
+    var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .minimal {
+        didSet { UserDefaults.standard.set(viewMode.rawValue, forKey: "viewMode") }
+    }
     var places: [Place] = []
     var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedDirs") ?? [])
     var treeKids: [String: [String]] = [:]

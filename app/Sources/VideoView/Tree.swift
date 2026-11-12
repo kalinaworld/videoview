@@ -69,7 +69,7 @@ struct TreeRow: View {
                     }
                 }
                 .frame(width: 14)
-                Image(systemName: icon).foregroundStyle(current ? Color.white : Color.accentColor)
+                Image(systemName: icon).foregroundStyle(current ? Color.white : Color.secondary)
                 Text(name ?? (path as NSString).lastPathComponent)
                     .lineLimit(1).truncationMode(.middle)
                     .foregroundStyle(current ? Color.white : Color.primary)
@@ -77,7 +77,7 @@ struct TreeRow: View {
             }
             .padding(.leading, CGFloat(depth) * 14)
             .padding(.vertical, 3).padding(.horizontal, 6)
-            .background(RoundedRectangle(cornerRadius: 5).fill(current ? Color.accentColor : .clear))
+            .background(RoundedRectangle(cornerRadius: 5).fill(current ? Color.steel : .clear))
             .contentShape(Rectangle())
             .onTapGesture { lib.open(path) }
             .help(path)

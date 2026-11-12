@@ -318,7 +318,7 @@ struct FolderDrop: ViewModifier {
             .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in lib.handleDrop(providers, to: dest) }
             .overlay {
                 if targeted {
-                    RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor, lineWidth: 3).allowsHitTesting(false)
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.steel, lineWidth: 3).allowsHitTesting(false)
                 }
             }
     }
