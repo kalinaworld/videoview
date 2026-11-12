@@ -100,6 +100,16 @@ struct ClipCard: View {
                             .padding(5)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if lib.duplicateCids.contains(clip.cid) {
+                        Image(systemName: "doc.on.doc.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4).padding(.vertical, 2)
+                            .background(.orange.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                            .padding(5)
+                    }
+                }
                 .contentShape(Rectangle())
                 .onContinuousHover { phase in
                     switch phase {

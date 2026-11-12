@@ -60,6 +60,15 @@ struct ContentView: View {
                 .help("Filter by flag color")
             }
             ToolbarItem {
+                Button {
+                    lib.showDuplicates.toggle()
+                } label: {
+                    Label("Duplicates", systemImage: lib.showDuplicates ? "doc.on.doc.fill" : "doc.on.doc")
+                        .foregroundStyle(lib.showDuplicates ? .orange : .secondary)
+                }
+                .help("Show only clips that exist in multiple folders")
+            }
+            ToolbarItem {
                 Picker("View", selection: $lib.viewMode) {
                     ForEach(ViewMode.allCases) { mode in
                         Text(mode.rawValue).tag(mode)
@@ -126,6 +135,7 @@ struct SidebarView: View {
 struct DetailView: View {
     @Environment(Library.self) private var lib
     @FocusState private var gridFocus: Bool
+    @State private var gridWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,43 +145,68 @@ struct DetailView: View {
                 if lib.subdirs.isEmpty && lib.visibleClips.isEmpty {
                     emptyState
                 } else {
-                    GeometryReader { geo in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 20) {
-                                ForEach(tileRows(width: geo.size.width - 32)) { row in
-                                    HStack(alignment: .top, spacing: 16) {
-                                        ForEach(row.items) { item in
-                                            let w = row.height * item.aspect
-                                            switch item.kind {
-                                            case .folder(let p): FolderCard(path: p, width: w)
-                                            case .clip(let c): ClipCard(clip: c, width: w)
+                    ScrollViewReader { proxy in
+                        GeometryReader { geo in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 20) {
+                                    ForEach(tileRows(width: geo.size.width - 32)) { row in
+                                        HStack(alignment: .top, spacing: 16) {
+                                            ForEach(row.items) { item in
+                                                let w = row.height * item.aspect
+                                                switch item.kind {
+                                                case .folder(let p): FolderCard(path: p, width: w)
+                                                case .clip(let c): ClipCard(clip: c, width: w).id(c.path)
+                                                }
                                             }
                                         }
                                     }
                                 }
+                                .padding(16)
                             }
-                            .padding(16)
+                            .onAppear { gridWidth = geo.size.width }
+                            .onChange(of: geo.size.width) { _, w in gridWidth = w }
                         }
-                    }
-                    .focusable()
-                    .focused($gridFocus)
-                    .focusEffectDisabled()
-                    .onChange(of: lib.selection) { _, _ in gridFocus = true }
-                    .onKeyPress("f") {
-                        let sel = lib.selectedClips
-                        guard !sel.isEmpty else { return .ignored }
-                        lib.toggleFlag(sel)
-                        return .handled
-                    }
-                    .onKeyPress(characters: CharacterSet(charactersIn: "a"), phases: .down) { press in
-                        guard press.modifiers.contains(.command) else { return .ignored }
-                        lib.selectAll()
-                        return .handled
-                    }
-                    .onKeyPress(.return) {
-                        guard let c = lib.selectedClip else { return .ignored }
-                        lib.playing = c
-                        return .handled
+                        .focusable()
+                        .focused($gridFocus)
+                        .focusEffectDisabled()
+                        .onChange(of: lib.selection) { _, _ in gridFocus = true }
+                        .onKeyPress("f") {
+                            let sel = lib.selectedClips
+                            guard !sel.isEmpty else { return .ignored }
+                            lib.toggleFlag(sel)
+                            return .handled
+                        }
+                        .onKeyPress(characters: CharacterSet(charactersIn: "a"), phases: .down) { press in
+                            guard press.modifiers.contains(.command) else { return .ignored }
+                            lib.selectAll()
+                            return .handled
+                        }
+                        .onKeyPress(.return) {
+                            guard let c = lib.selectedClip else { return .ignored }
+                            lib.playing = c
+                            return .handled
+                        }
+                        .onKeyPress(.space) {
+                            guard let c = lib.selectedClip else { return .ignored }
+                            lib.playing = c
+                            return .handled
+                        }
+                        .onKeyPress(.leftArrow) {
+                            guard !lib.visibleClips.isEmpty else { return .ignored }
+                            moveByClip(-1, proxy: proxy); return .handled
+                        }
+                        .onKeyPress(.rightArrow) {
+                            guard !lib.visibleClips.isEmpty else { return .ignored }
+                            moveByClip(1, proxy: proxy); return .handled
+                        }
+                        .onKeyPress(.upArrow) {
+                            guard !lib.visibleClips.isEmpty else { return .ignored }
+                            moveByRow(-1, proxy: proxy); return .handled
+                        }
+                        .onKeyPress(.downArrow) {
+                            guard !lib.visibleClips.isEmpty else { return .ignored }
+                            moveByRow(1, proxy: proxy); return .handled
+                        }
                     }
                 }
                 Divider()
@@ -191,6 +226,41 @@ struct DetailView: View {
         let items = lib.subdirs.map { TileItem(kind: .folder($0), aspect: 16.0 / 9.0) }
             + lib.visibleClips.map { TileItem(kind: .clip($0), aspect: $0.tileAspect) }
         return justify(items, width: width, target: lib.rowHeight)
+    }
+
+    private func moveByClip(_ delta: Int, proxy: ScrollViewProxy) {
+        let list = lib.visibleClips
+        guard !list.isEmpty else { return }
+        let idx = list.firstIndex(where: { lib.selection.contains($0.path) }) ?? (delta > 0 ? -1 : list.count)
+        let newIdx = max(0, min(list.count - 1, idx + delta))
+        selectAndScroll(list[newIdx], proxy: proxy)
+    }
+
+    private func moveByRow(_ delta: Int, proxy: ScrollViewProxy) {
+        let rows = tileRows(width: max(gridWidth - 32, 200))
+        let clipRows: [[ClipRow]] = rows.compactMap { row in
+            let clips = row.items.compactMap { item -> ClipRow? in
+                if case .clip(let c) = item.kind { return c } else { return nil }
+            }
+            return clips.isEmpty ? nil : clips
+        }
+        guard !clipRows.isEmpty else { return }
+        guard let cur = lib.visibleClips.first(where: { lib.selection.contains($0.path) }) else {
+            if let first = lib.visibleClips.first { selectAndScroll(first, proxy: proxy) }
+            return
+        }
+        guard let rowIdx = clipRows.firstIndex(where: { $0.contains(where: { $0.path == cur.path }) }),
+              let colIdx = clipRows[rowIdx].firstIndex(where: { $0.path == cur.path }) else { return }
+        let newRowIdx = max(0, min(clipRows.count - 1, rowIdx + delta))
+        guard newRowIdx != rowIdx else { return }
+        let targetRow = clipRows[newRowIdx]
+        selectAndScroll(targetRow[min(colIdx, targetRow.count - 1)], proxy: proxy)
+    }
+
+    private func selectAndScroll(_ clip: ClipRow, proxy: ScrollViewProxy) {
+        lib.selection = [clip.path]
+        lib.anchor = clip.path
+        proxy.scrollTo(clip.path, anchor: .center)
     }
 
     private var emptyState: some View {

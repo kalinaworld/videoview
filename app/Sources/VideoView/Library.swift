@@ -36,6 +36,8 @@ final class Library {
     var flagFilter: FlagFilter = .off
     var flagged: Set<String> { Set(flagColors.keys) }
     var spaceSaverTarget: ClipRow? = nil
+    var duplicateCids: Set<String> = []
+    var showDuplicates = false
     var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .minimal {
         didSet { UserDefaults.standard.set(viewMode.rawValue, forKey: "viewMode") }
     }
@@ -56,6 +58,7 @@ final class Library {
         do { db = try Database(path: support) } catch { fatalError("Cannot open the index database: \(error)") }
         roots = db.roots()
         flagColors = db.flagColors()
+        duplicateCids = db.duplicateCids()
         places = Self.makePlaces()
         refreshRootStatus()
         refreshVolumes()
@@ -123,6 +126,7 @@ final class Library {
         case .color(let c): list = list.filter { flagColors[$0.cid] == c }
         }
         if let cam = cameraFilter { list = list.filter { $0.camera == cam } }
+        if showDuplicates { list = list.filter { duplicateCids.contains($0.cid) } }
         switch sort {
         case .name: list.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         case .date: list.sort { $0.sortDate > $1.sortDate }
@@ -345,6 +349,7 @@ final class Library {
         }
         if currentDir == dir {
             Task.detached(priority: .background) { thumbs.trim(toBytes: 4 << 30) }
+            duplicateCids = db.duplicateCids()
         }
     }
 
@@ -378,6 +383,7 @@ final class Library {
         db.removeClip(path: clip.path)
         clips.removeAll { $0.path == clip.path }
         selection.remove(clip.path)
+        duplicateCids = db.duplicateCids()
     }
 
     /// Asks, then moves the file to the Trash. If the volume has no Trash (a NAS often does not), asks once more

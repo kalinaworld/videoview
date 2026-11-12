@@ -23,14 +23,9 @@ A native macOS app (SwiftUI, SwiftPM, macOS 15+) for browsing, trimming and tidy
 - Flags and other user data live in the index DB keyed by content id, so they follow moved and renamed clips.
 
 ## Status
-Shipped: browse grid with cached posters and hover scrub, player (J/K/L), lossless trim with verification, delete to Trash after verified trim, flags, camera filter and sort, Finder-style folder browsing and sidebar tree, move/new folder/rename, justified grid for vertical clips, Control Room card.
+Shipped: browse grid with cached posters and hover scrub, player (J/K/L), lossless trim with verification, delete to Trash after verified trim, color flags (orange/red/green/blue) with filter, camera filter and sort, Finder-style folder browsing and sidebar tree, move/new folder/rename, justified grid for vertical clips, Control Room card, Minimal/Info view toggle, army green accent, bitrate pill and HEVC savings on cards, Space Saver (HEVC re-encode with presets, sample preview, verification), app design pass, date shot on cards, Reveal in Finder on sidebar and folder cards, grid keyboard navigation (arrow keys + Space), duplicates check (badge on cards + toolbar filter toggle).
 
-Next, in this order:
-1. Bitrate and potential savings on each card
-2. Date shot on each card
-3. Color flags (red, green, blue)
-4. Space Saver (HEVC re-encode with presets, sample preview, verification)
-5. App design pass (mock up 3 or 4 directions first, review with Noah, then implement)
+Next: see docs/video-view-todo.md
 
 Full list, including smaller items, is in `docs/video-view-todo.md`. Update it when something ships or a new idea comes up.
 

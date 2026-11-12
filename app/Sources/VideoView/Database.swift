@@ -179,4 +179,10 @@ final class Database: @unchecked Sendable {
     }
 
     func removeRoot(_ path: String) { run("DELETE FROM roots WHERE path=?", [path]) }
+
+    // MARK: duplicates
+
+    func duplicateCids() -> Set<String> {
+        Set(rows("SELECT cid FROM clips GROUP BY cid HAVING COUNT(*) > 1", [], { $0.text(0) }))
+    }
 }
