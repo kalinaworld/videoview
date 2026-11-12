@@ -82,6 +82,10 @@ struct TreeRow: View {
             .onTapGesture { lib.open(path) }
             .help(path)
             .folderDrop(path)
+            .contextMenu {
+                Button("Open") { lib.open(path) }
+                Button("Reveal in Finder") { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
+            }
 
             if isOpen, let kids {
                 ForEach(kids, id: \.self) { TreeRow(path: $0, depth: depth + 1) }

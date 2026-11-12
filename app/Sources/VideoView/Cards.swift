@@ -18,6 +18,10 @@ struct FolderCard: View {
         .contentShape(Rectangle())
         .onTapGesture { lib.open(path) }
         .folderDrop(path)
+        .contextMenu {
+            Button("Open") { lib.open(path) }
+            Button("Reveal in Finder") { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
+        }
     }
 }
 
@@ -128,6 +132,10 @@ struct ClipCard: View {
                         if !clip.camera.isEmpty {
                             Text("·").font(.caption).foregroundStyle(.tertiary)
                             Text(clip.camera).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        if clip.created > 0 {
+                            Text("·").font(.caption).foregroundStyle(.tertiary)
+                            Text(formatShotDate(clip.created)).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
