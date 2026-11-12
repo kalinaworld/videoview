@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.noahkalina.videoview</string>
+    <key>CFBundleName</key><string>Video View</string>
+    <key>CFBundleDisplayName</key><string>Video View</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleExecutable</key><string>VideoView</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.1</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSMinimumSystemVersion</key><string>15.0</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>NSDesktopFolderUsageDescription</key><string>Video View lists clips in folders you open.</string>
+    <key>NSDocumentsFolderUsageDescription</key><string>Video View lists clips in folders you open.</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>Video View lists clips in folders you open.</string>
+    <key>NSRemovableVolumesUsageDescription</key><string>Video View reads clips from external drives and the NAS.</string>
+    <key>NSNetworkVolumesUsageDescription</key><string>Video View reads clips from the NAS.</string>
+</dict>
+</plist>

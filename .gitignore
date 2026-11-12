@@ -1,0 +1,7 @@
+.DS_Store
+*.partial
+.*_hevc_sample.mp4
+clip-spike/
+spike-output/
+__pycache__/
+*.pyc
