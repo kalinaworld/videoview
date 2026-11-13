@@ -103,16 +103,23 @@ extension Library {
                 guard let self else { return }
                 let internalSet = Set(self.dragPaths)
                 var rows: [ClipRow] = []
+                var folderPaths: [String] = []
                 if !urls.isEmpty, urls.allSatisfy({ internalSet.contains($0.path) }) {
                     rows = self.clips.filter { internalSet.contains($0.path) }
                 } else {
-                    for u in urls where Indexer.videoExts.contains(u.pathExtension.lowercased()) {
-                        let v = try? u.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-                        rows.append(ClipRow(path: u.path, cid: "", dir: u.deletingLastPathComponent().path, name: u.lastPathComponent,
-                                            size: Int64(v?.fileSize ?? 0), mtime: v?.contentModificationDate?.timeIntervalSince1970 ?? 0))
+                    for u in urls {
+                        var isDir: ObjCBool = false
+                        if FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue {
+                            folderPaths.append(u.path)
+                        } else if Indexer.videoExts.contains(u.pathExtension.lowercased()) {
+                            let v = try? u.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                            rows.append(ClipRow(path: u.path, cid: "", dir: u.deletingLastPathComponent().path, name: u.lastPathComponent,
+                                                size: Int64(v?.fileSize ?? 0), mtime: v?.contentModificationDate?.timeIntervalSince1970 ?? 0))
+                        }
                     }
                 }
                 self.dragPaths = []
+                for fp in folderPaths { self.moveFolder(fp, to: dest) }
                 await self.moveClips(rows, to: dest)
             }
         }
@@ -153,6 +160,94 @@ extension Library {
         subdirs.append(path)
         subdirs.sort { $0.localizedStandardCompare($1) == .orderedAscending }
         if !moving.isEmpty { Task { await moveClips(moving, to: path) } }
+    }
+
+    // MARK: folder operations
+
+    func trashFolder(_ path: String) {
+        let name = (path as NSString).lastPathComponent
+        let a = NSAlert()
+        a.alertStyle = .warning
+        a.messageText = "Move \"\(name)\" to the Trash?"
+        a.informativeText = "The folder and everything inside it will be moved to the Trash."
+        a.addButton(withTitle: "Move to Trash")
+        a.addButton(withTitle: "Cancel")
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+        } catch {
+            showError("Could not move \"\(name)\" to the Trash.", error.localizedDescription)
+            return
+        }
+
+        db.removeTree(at: path)
+        subdirs.removeAll { $0 == path }
+        treeKids.removeValue(forKey: path)
+        let parent = (path as NSString).deletingLastPathComponent
+        if treeKids[parent] != nil { loadKids(parent, force: true) }
+        if currentDir == path || currentDir?.hasPrefix(path + "/") == true { open(parent) }
+        duplicateCids = db.duplicateCids()
+    }
+
+    func moveFolder(_ path: String, to destDir: String) {
+        let name = (path as NSString).lastPathComponent
+        guard path != destDir, !destDir.hasPrefix(path + "/") else { return }
+
+        let destPath = (destDir as NSString).appendingPathComponent(name)
+        guard destPath != path else { return }
+
+        if FileManager.default.fileExists(atPath: destPath) {
+            showError("Can't move \"\(name)\".", "A folder with that name already exists in \"\((destDir as NSString).lastPathComponent)\".")
+            return
+        }
+
+        let srcURL = URL(fileURLWithPath: path)
+        let dstURL = URL(fileURLWithPath: destPath)
+        guard Library.sameVolume(srcURL, dstURL) else {
+            showError("Can't move \"\(name)\" to another drive.", "Drag it in the Finder to move folders across drives.")
+            return
+        }
+
+        do {
+            try FileManager.default.moveItem(at: srcURL, to: dstURL)
+        } catch {
+            showError("Could not move \"\(name)\".", error.localizedDescription)
+            return
+        }
+
+        db.renamePaths(from: path, to: destPath)
+
+        if let idx = roots.firstIndex(of: path) {
+            db.removeRoot(path)
+            db.addRoot(destPath)
+            roots[idx] = destPath
+        }
+
+        subdirs.removeAll { $0 == path }
+        treeKids.removeValue(forKey: path)
+        let parent = (path as NSString).deletingLastPathComponent
+        if treeKids[parent] != nil { loadKids(parent, force: true) }
+        if treeKids[destDir] != nil { loadKids(destDir, force: true) }
+
+        if currentDir == path {
+            open(destPath)
+        } else if let cur = currentDir, cur.hasPrefix(path + "/") {
+            open(destPath + cur.dropFirst(path.count))
+        }
+    }
+
+    func chooseFolderDestinationAndMove(_ path: String) {
+        let name = (path as NSString).lastPathComponent
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true
+        p.canChooseFiles = false
+        p.allowsMultipleSelection = false
+        p.prompt = "Move Here"
+        p.message = "Choose the folder to move \"\(name)\" into."
+        if let c = currentDir { p.directoryURL = URL(fileURLWithPath: c) }
+        guard p.runModal() == .OK, let url = p.url else { return }
+        moveFolder(path, to: url.path)
     }
 
     func chooseDestinationAndMove(_ list: [ClipRow]) {

@@ -80,11 +80,15 @@ struct TreeRow: View {
             .background(RoundedRectangle(cornerRadius: 5).fill(current ? Color.steel : .clear))
             .contentShape(Rectangle())
             .onTapGesture { lib.open(path) }
+            .onDrag { NSItemProvider(object: URL(fileURLWithPath: path) as NSURL) }
             .help(path)
             .folderDrop(path)
             .contextMenu {
                 Button("Open") { lib.open(path) }
                 Button("Reveal in Finder") { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
+                Divider()
+                Button("Move to…") { lib.chooseFolderDestinationAndMove(path) }
+                Button("Move to Trash…") { lib.trashFolder(path) }
             }
 
             if isOpen, let kids {

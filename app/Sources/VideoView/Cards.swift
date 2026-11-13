@@ -17,10 +17,14 @@ struct FolderCard: View {
         .frame(width: width, alignment: .topLeading)
         .contentShape(Rectangle())
         .onTapGesture { lib.open(path) }
+        .onDrag { NSItemProvider(object: URL(fileURLWithPath: path) as NSURL) }
         .folderDrop(path)
         .contextMenu {
             Button("Open") { lib.open(path) }
             Button("Reveal in Finder") { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
+            Divider()
+            Button("Move to…") { lib.chooseFolderDestinationAndMove(path) }
+            Button("Move to Trash…") { lib.trashFolder(path) }
         }
     }
 }

@@ -182,6 +182,31 @@ final class Database: @unchecked Sendable {
 
     func removeRoot(_ path: String) { run("DELETE FROM roots WHERE path=?", [path]) }
 
+    /// Remove all clips and dir entries under (and including) `path`.
+    func removeTree(at path: String) {
+        let like = path + "/%"
+        run("DELETE FROM clips WHERE dir = ? OR dir LIKE ?", [path, like])
+        run("DELETE FROM dirs WHERE path = ? OR path LIKE ?", [path, like])
+    }
+
+    /// Rewrite every DB path that starts with `old` to start with `new` instead.
+    func renamePaths(from old: String, to new: String) {
+        let prefLen = old.utf8.count   // used as SQLite substr offset (paths are ASCII-safe)
+        let like = old + "/%"
+        // Clips whose dir is exactly `old`
+        run("UPDATE clips SET path = ? || substr(path, ?), dir = ? WHERE dir = ?",
+            [new, prefLen + 1, new, old])
+        // Clips inside subdirs of `old`
+        run("UPDATE clips SET path = ? || substr(path, ?), dir = ? || substr(dir, ?) WHERE path LIKE ?",
+            [new, prefLen + 1, new, prefLen + 1, like])
+        // The folder row itself
+        run("UPDATE dirs SET path = ?, parent = ? WHERE path = ?",
+            [new, (new as NSString).deletingLastPathComponent, old])
+        // Subdir rows under `old`
+        run("UPDATE dirs SET path = ? || substr(path, ?), parent = ? || substr(parent, ?) WHERE path LIKE ?",
+            [new, prefLen + 1, new, prefLen + 1, like])
+    }
+
     // MARK: duplicates
 
     func duplicateCids() -> Set<String> {
