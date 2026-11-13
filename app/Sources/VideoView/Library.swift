@@ -36,8 +36,11 @@ final class Library {
     var flagFilter: FlagFilter = .off
     var flagged: Set<String> { Set(flagColors.keys) }
     var spaceSaverTarget: ClipRow? = nil
-    var duplicateCids: Set<String> = []
-    var showDuplicates = false
+    var duplicateCids: Set<String> = []          // exact copies: same content id in more than one place
+    var similarMap: [String: [String]] = [:]     // look-alikes (re-encodes, trimmed copies): content id to other content ids
+    var duplicateFilter: DuplicateFilter = .off
+    @ObservationIgnored private var similarTask: Task<Void, Never>?
+    @ObservationIgnored private var similarSignature = -1
     var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .minimal {
         didSet { UserDefaults.standard.set(viewMode.rawValue, forKey: "viewMode") }
     }
@@ -126,7 +129,12 @@ final class Library {
         case .color(let c): list = list.filter { flagColors[$0.cid] == c }
         }
         if let cam = cameraFilter { list = list.filter { $0.camera == cam } }
-        if showDuplicates { list = list.filter { duplicateCids.contains($0.cid) } }
+        switch duplicateFilter {
+        case .off: break
+        case .exact: list = list.filter { duplicateCids.contains($0.cid) }
+        case .similar: list = list.filter { similarMap[$0.cid] != nil }
+        case .any: list = list.filter { duplicateCids.contains($0.cid) || similarMap[$0.cid] != nil }
+        }
         switch sort {
         case .name: list.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         case .date: list.sort { $0.sortDate > $1.sortDate }
@@ -318,18 +326,40 @@ final class Library {
 
         let listing = await Task.detached(priority: .utility) { Library.listDirectory(dir) }.value
         guard !Task.isCancelled, currentDir == dir else { return }
-        guard let listing else { offline = true; return }
+        guard let listing else {
+            if !FileManager.default.fileExists(atPath: dir) {
+                // Folder was deleted: purge the DB, clear the view, and go up.
+                db.deleteClips(inDir: dir, keeping: [])
+                clips = []
+                subdirs = []
+                treeKids.removeValue(forKey: dir)
+                let parent = (dir as NSString).deletingLastPathComponent
+                loadKids(parent, force: true)
+                open(parent)
+            } else {
+                offline = true
+            }
+            return
+        }
         offline = false
 
         let rows = await Task.detached(priority: .utility) { Library.reconcile(dir, listing, db) }.value
         guard !Task.isCancelled, currentDir == dir else { return }
         clips = rows
         subdirs = listing.subdirs
+        // Keep the sidebar tree in sync with what the filesystem actually has.
+        treeKids[dir] = listing.subdirs
+        let parentDir = (dir as NSString).deletingLastPathComponent
+        if treeKids[parentDir] != nil { loadKids(parentDir, force: true) }
 
         let todo = rows.filter { $0.status != 1 || !thumbs.exists($0.cid) }
         progressTotal = todo.count
         progressDone = 0
-        guard !todo.isEmpty else { return }
+        guard !todo.isEmpty else {
+            duplicateCids = db.duplicateCids()
+            refreshSimilar()
+            return
+        }
 
         let work: @Sendable (ClipRow) async -> ClipRow = { r in
             let done = await Indexer.process(r, thumbs: thumbs)
@@ -350,6 +380,32 @@ final class Library {
         if currentDir == dir {
             Task.detached(priority: .background) { thumbs.trim(toBytes: 4 << 30) }
             duplicateCids = db.duplicateCids()
+            refreshSimilar()
+        }
+    }
+
+    /// Fingerprints any clip that has cached frames but no fingerprint yet, then looks for look-alikes across the whole
+    /// index (not only this folder). Runs in the background and only reads the cache, never a clip.
+    func refreshSimilar() {
+        similarTask?.cancel()
+        let db = self.db, thumbs = self.thumbs
+        let known = similarSignature
+        similarTask = Task.detached(priority: .background) { [weak self] in
+            var added = 0
+            for cid in db.cidsNeedingFingerprint() {
+                if Task.isCancelled { return }
+                guard let pack = thumbs.pack(cid) else { continue }
+                db.setFingerprint(cid, Fingerprint.encode(Fingerprint.hashes(from: pack)))
+                added += 1
+            }
+            let prints = db.clipPrints()
+            if added == 0 && prints.count == known { return }      // nothing changed since the last pass
+            guard let map = Similarity.findSimilar(prints), !Task.isCancelled else { return }
+            let count = prints.count
+            await MainActor.run { [weak self] in
+                self?.similarMap = map
+                self?.similarSignature = count
+            }
         }
     }
 
@@ -384,6 +440,7 @@ final class Library {
         clips.removeAll { $0.path == clip.path }
         selection.remove(clip.path)
         duplicateCids = db.duplicateCids()
+        refreshSimilar()
     }
 
     /// Asks, then moves the file to the Trash. If the volume has no Trash (a NAS often does not), asks once more
