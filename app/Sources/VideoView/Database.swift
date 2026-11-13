@@ -39,6 +39,8 @@ final class Database: @unchecked Sendable {
         // Metadata and flags are keyed by content id, so they follow a file when it is moved or renamed.
         run("CREATE TABLE IF NOT EXISTS meta(cid TEXT PRIMARY KEY, duration REAL, width INTEGER, height INTEGER, fps REAL, codec TEXT, created REAL, camera TEXT)")
         run("CREATE TABLE IF NOT EXISTS flags(cid TEXT PRIMARY KEY, color INTEGER NOT NULL DEFAULT 1)")
+        // Perceptual fingerprints of the cached frames, keyed by content id. Rebuildable, used to find look-alike clips.
+        run("CREATE TABLE IF NOT EXISTS fingerprints(cid TEXT PRIMARY KEY, h TEXT NOT NULL)")
         let ver = rows("PRAGMA user_version", [], { $0.int(0) }).first ?? 0
         if ver < 1 {
             run("INSERT OR IGNORE INTO meta SELECT cid,duration,width,height,fps,codec,created,camera FROM clips WHERE status=1 AND camera!=''")
@@ -184,5 +186,31 @@ final class Database: @unchecked Sendable {
 
     func duplicateCids() -> Set<String> {
         Set(rows("SELECT cid FROM clips GROUP BY cid HAVING COUNT(*) > 1", [], { $0.text(0) }))
+    }
+
+    func duplicatePaths(for cid: String) -> [String] {
+        rows("SELECT path FROM clips WHERE cid=? ORDER BY path", [cid], { $0.text(0) })
+    }
+
+    // MARK: fingerprints (look-alike clips)
+
+    func setFingerprint(_ cid: String, _ h: String) {
+        run("INSERT OR REPLACE INTO fingerprints(cid,h) VALUES(?,?)", [cid, h])
+    }
+
+    /// Indexed clips that have thumbnails but no fingerprint yet.
+    func cidsNeedingFingerprint() -> [String] {
+        rows("SELECT DISTINCT cid FROM clips WHERE status=1 AND cid NOT IN (SELECT cid FROM fingerprints)", [], { $0.text(0) })
+    }
+
+    /// Fingerprints of clips that are still in the index, with what the matcher needs (length and shape).
+    func clipPrints() -> [ClipPrint] {
+        rows("""
+            SELECT f.cid, f.h, m.duration, m.width, m.height FROM fingerprints f JOIN meta m ON m.cid = f.cid
+            WHERE m.duration > 0 AND m.height > 0 AND f.cid IN (SELECT cid FROM clips)
+            """, [], { r in
+            ClipPrint(cid: r.text(0), duration: r.double(2),
+                      aspect: Double(r.int(3)) / Double(max(r.int(4), 1)), hashes: Fingerprint.decode(r.text(1)))
+        })
     }
 }

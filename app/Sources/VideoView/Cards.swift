@@ -32,6 +32,7 @@ struct ClipCard: View {
     @State private var poster: NSImage?
     @State private var hoverFraction: Double?
     @State private var hovering = false
+    @State private var showCopyPopover = false
 
     private var selected: Bool { lib.selection.contains(clip.path) }
     private var version: Int { lib.thumbVersion[clip.cid] ?? 0 }
@@ -103,19 +104,33 @@ struct ClipCard: View {
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 3) {
                         if let n = lib.similarMap[clip.cid]?.count {
-                            Image(systemName: "square.on.square")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4).padding(.vertical, 2)
-                                .background(Color.indigo.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
-                                .help("Looks like \(n) other clip\(n == 1 ? "" : "s")")
+                            Button {
+                                lib.selectSimilarGroup(clip.cid)
+                            } label: {
+                                Image(systemName: "square.on.square")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4).padding(.vertical, 2)
+                                    .background(Color.indigo.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Looks like \(n) other clip\(n == 1 ? "" : "s") — click to select all")
                         }
                         if lib.duplicateCids.contains(clip.cid) {
-                            Image(systemName: "doc.on.doc.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4).padding(.vertical, 2)
-                                .background(.orange.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                            Button {
+                                showCopyPopover = true
+                            } label: {
+                                Image(systemName: "doc.on.doc.fill")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4).padding(.vertical, 2)
+                                    .background(.orange.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Exact copy exists elsewhere — click to see all locations")
+                            .popover(isPresented: $showCopyPopover, arrowEdge: .bottom) {
+                                CopyLocationsPopover(cid: clip.cid)
+                            }
                         }
                     }
                     .padding(5)
@@ -230,5 +245,42 @@ struct ClipCard: View {
         if mbps > 300 { return .steel }
         if mbps > 80  { return Color(red: 0.8, green: 0.65, blue: 0.2) }
         return .secondary
+    }
+}
+
+private struct CopyLocationsPopover: View {
+    @Environment(Library.self) private var lib
+    let cid: String
+
+    var body: some View {
+        let paths = lib.duplicatePaths(for: cid)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Exact Copies (\(paths.count))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 6)
+            Divider()
+            ForEach(paths, id: \.self) { path in
+                let dir = (path as NSString).deletingLastPathComponent
+                let folder = (dir as NSString).lastPathComponent
+                let name = (path as NSString).lastPathComponent
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(name).font(.caption).lineLimit(1).truncationMode(.middle)
+                        Text(folder).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer()
+                    Button("Go") {
+                        lib.open(dir)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                Divider()
+            }
+        }
+        .frame(minWidth: 260, maxWidth: 320)
+        .padding(.bottom, 2)
     }
 }

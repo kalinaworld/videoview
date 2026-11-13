@@ -27,6 +27,16 @@ extension Library {
 
     func selectAll() { selection = Set(visibleClips.map { $0.path }) }
 
+    func selectSimilarGroup(_ cid: String) {
+        let group = ([cid] + (similarMap[cid] ?? [])).map { $0 }
+        let paths = clips.filter { group.contains($0.cid) }.map { $0.path }
+        selection = Set(paths)
+    }
+
+    func duplicatePaths(for cid: String) -> [String] {
+        db.duplicatePaths(for: cid)
+    }
+
     func click(_ clip: ClipRow, command: Bool, shift: Bool) {
         let list = visibleClips
         if shift, let a = anchor, let i = list.firstIndex(where: { $0.path == a }),
