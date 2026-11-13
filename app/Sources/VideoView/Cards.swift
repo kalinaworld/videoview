@@ -51,7 +51,7 @@ struct ClipCard: View {
                     }
                     if let f = hoverFraction {
                         GeometryReader { g in
-                            Rectangle().fill(Color.steel).frame(width: g.size.width * f, height: 3)
+                            Rectangle().fill(Color.white).frame(width: g.size.width * f, height: 5)
                                 .frame(maxHeight: .infinity, alignment: .bottom)
                         }
                     }
@@ -101,14 +101,24 @@ struct ClipCard: View {
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if lib.duplicateCids.contains(clip.cid) {
-                        Image(systemName: "doc.on.doc.fill")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4).padding(.vertical, 2)
-                            .background(.orange.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
-                            .padding(5)
+                    HStack(spacing: 3) {
+                        if let n = lib.similarMap[clip.cid]?.count {
+                            Image(systemName: "square.on.square")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Color.indigo.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                                .help("Looks like \(n) other clip\(n == 1 ? "" : "s")")
+                        }
+                        if lib.duplicateCids.contains(clip.cid) {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(.orange.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
+                        }
                     }
+                    .padding(5)
                 }
                 .contentShape(Rectangle())
                 .onContinuousHover { phase in
@@ -124,7 +134,7 @@ struct ClipCard: View {
             }
             .aspectRatio(mediaAspect, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.steel : .clear, lineWidth: 3))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color(red: 1, green: 0.624, blue: 0.039) : .clear, lineWidth: 5))
 
             if !isMinimal {
                 Text(clip.name).font(.callout).lineLimit(1).truncationMode(.middle)
