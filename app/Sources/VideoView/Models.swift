@@ -122,6 +122,21 @@ enum FlagFilter: Hashable {
     case off, any, color(FlagColor)
 }
 
+enum DuplicateFilter: Hashable {
+    case off, exact, similar, any
+}
+
+enum MediaKind { case video, image, audio }
+
+extension ClipRow {
+    var mediaKind: MediaKind {
+        let ext = (name as NSString).pathExtension.lowercased()
+        if Indexer.imageExts.contains(ext) { return .image }
+        if Indexer.audioExts.contains(ext) { return .audio }
+        return .video
+    }
+}
+
 // MARK: - Date formatting
 
 func formatShotDate(_ t: Double) -> String {

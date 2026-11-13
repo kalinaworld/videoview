@@ -253,6 +253,56 @@ struct TrimTimeline: View {
     }
 }
 
+struct ImageSheet: View {
+    let clip: ClipRow
+    @Environment(Library.self) private var lib
+    @Environment(\.dismiss) private var dismiss
+    @State private var fullImage: NSImage?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Color.black
+                if let img = fullImage ?? lib.thumbs.poster(clip.cid) {
+                    Image(nsImage: img).resizable().scaledToFit()
+                } else {
+                    ProgressView()
+                }
+            }
+            .frame(minWidth: 900, minHeight: 540)
+            .overlay(alignment: .topLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .padding(12)
+            }
+            HStack(spacing: 10) {
+                Text(clip.name).font(.callout).lineLimit(1)
+                Button { lib.toggleFlag(clip.cid) } label: {
+                    let fc = lib.flagColors[clip.cid]
+                    Image(systemName: fc != nil ? "flag.fill" : "flag")
+                        .foregroundStyle(fc?.swiftUIColor ?? .secondary)
+                }.buttonStyle(.plain).help("Flag (F)")
+                Spacer()
+                if clip.width > 0 { Text("\(clip.width) × \(clip.height)").font(.caption).foregroundStyle(.secondary) }
+                if clip.created > 0 { Text(formatShotDate(clip.created)).font(.caption).foregroundStyle(.secondary) }
+                Text(formatSize(clip.size)).font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(10)
+        }
+        .onKeyPress(.escape) { dismiss(); return .handled }
+        .task {
+            fullImage = await Task.detached(priority: .userInitiated) { NSImage(contentsOfFile: clip.path) }.value
+        }
+    }
+}
+
 struct PlayerSheet: View {
     let clip: ClipRow
     @Environment(Library.self) private var lib
@@ -265,6 +315,11 @@ struct PlayerSheet: View {
         VStack(spacing: 0) {
             PlayerHost(controller: controller, duration: clip.duration, onClose: { dismiss() })
                 .frame(minWidth: 960, minHeight: 520)
+                .overlay(alignment: .center) {
+                    if clip.mediaKind == .audio {
+                        Image(systemName: "music.note").font(.system(size: 72)).foregroundStyle(.white.opacity(0.25))
+                    }
+                }
                 .overlay(alignment: .topLeading) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
@@ -278,9 +333,11 @@ struct PlayerSheet: View {
                     .help("Close (Esc)")
                     .padding(12)
                 }
-            TrimTimeline(clip: clip, controller: controller)
-            trimBar
-            trimResult
+            if clip.mediaKind == .video {
+                TrimTimeline(clip: clip, controller: controller)
+                trimBar
+                trimResult
+            }
             HStack {
                 Text(clip.name).font(.callout).lineLimit(1)
                 Button { lib.toggleFlag(clip.cid) } label: {

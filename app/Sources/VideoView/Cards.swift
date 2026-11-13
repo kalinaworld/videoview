@@ -49,12 +49,14 @@ struct ClipCard: View {
                     Color.black
                     if let img = displayImage {
                         Image(nsImage: img).resizable().scaledToFit()
+                    } else if clip.mediaKind == .audio {
+                        Image(systemName: "music.note").font(.system(size: 36)).foregroundStyle(.secondary)
                     } else if clip.status == 2 {
                         Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
                     } else {
                         ProgressView().controlSize(.small)
                     }
-                    if let f = hoverFraction {
+                    if let f = hoverFraction, clip.mediaKind == .video {
                         GeometryReader { g in
                             Rectangle().fill(Color.white).frame(width: g.size.width * f, height: 5)
                                 .frame(maxHeight: .infinity, alignment: .bottom)
@@ -96,7 +98,7 @@ struct ClipCard: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if clip.duration > 0 {
+                    if clip.duration > 0, clip.mediaKind != .image {
                         Text(hoverFraction.map { formatDuration($0 * clip.duration) } ?? formatDuration(clip.duration))
                             .font(.caption2.monospacedDigit())
                             .padding(.horizontal, 5).padding(.vertical, 2)
@@ -143,7 +145,9 @@ struct ClipCard: View {
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let p):
-                        hoverFraction = min(max(p.x / max(geo.size.width, 1), 0), 0.9999)
+                        if clip.mediaKind == .video {
+                            hoverFraction = min(max(p.x / max(geo.size.width, 1), 0), 0.9999)
+                        }
                         hovering = true
                     case .ended:
                         hoverFraction = nil
@@ -205,7 +209,7 @@ struct ClipCard: View {
                 }
                 if allFlagged { Divider(); Button("Remove Flag") { lib.removeFlag(group) } }
             }
-            Button("Space Saver…") { lib.spaceSaverTarget = clip }
+            if clip.mediaKind == .video { Button("Space Saver…") { lib.spaceSaverTarget = clip } }
             Divider()
             Button(n > 1 ? "Move \(n) Clips to…" : "Move to…") { lib.chooseDestinationAndMove(group) }
             Button(n > 1 ? "New Folder with \(n) Clips…" : "New Folder with This Clip…") { lib.promptNewFolder(moving: group) }

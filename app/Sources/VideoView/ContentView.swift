@@ -60,13 +60,17 @@ struct ContentView: View {
                 .help("Filter by flag color")
             }
             ToolbarItem {
-                Button {
-                    lib.showDuplicates.toggle()
+                Menu {
+                    Button("Show All") { lib.duplicateFilter = .off }
+                    Divider()
+                    Button("Exact Copies") { lib.duplicateFilter = .exact }
+                    Button("Looks Similar") { lib.duplicateFilter = .similar }
+                    Button("Exact and Similar") { lib.duplicateFilter = .any }
                 } label: {
-                    Label("Duplicates", systemImage: lib.showDuplicates ? "doc.on.doc.fill" : "doc.on.doc")
-                        .foregroundStyle(lib.showDuplicates ? .orange : .secondary)
+                    Label("Duplicates", systemImage: lib.duplicateFilter == .off ? "doc.on.doc" : "doc.on.doc.fill")
+                        .foregroundStyle(lib.duplicateFilter == .off ? Color.secondary : Color.orange)
                 }
-                .help("Show only clips that exist in multiple folders")
+                .help("Find clips that exist in several places (exact) or look the same (similar)")
             }
             ToolbarItem {
                 Picker("View", selection: $lib.viewMode) {
@@ -80,7 +84,8 @@ struct ContentView: View {
             }
         }
         .sheet(item: $lib.playing) { clip in
-            PlayerSheet(clip: clip)
+            if clip.mediaKind == .image { ImageSheet(clip: clip) }
+            else { PlayerSheet(clip: clip) }
         }
         .sheet(item: $lib.spaceSaverTarget) { clip in
             SpaceSaverSheet(clip: clip)

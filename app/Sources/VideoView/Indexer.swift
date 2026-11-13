@@ -8,6 +8,11 @@ import UniformTypeIdentifiers
 /// Identifies files and extracts metadata plus small frames. Never writes to a clip.
 enum Indexer {
     static let videoExts: Set<String> = ["mov", "mp4", "m4v", "mts", "m2ts", "3gp"]
+    static let imageExts: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "tif",
+                                          "gif", "bmp", "webp", "dng", "arw", "nef", "cr2", "cr3",
+                                          "raf", "orf", "rw2", "pef", "raw"]
+    static let audioExts: Set<String> = ["mp3", "m4a", "aiff", "aif", "wav", "flac", "aac", "caf"]
+    static var allExts: Set<String> { videoExts.union(imageExts).union(audioExts) }
 
     /// Content id: file size plus the first and last 64 KB. Cheap on the NAS, survives renames and moves.
     static func contentID(path: String, size: Int64) -> String {
@@ -68,9 +73,77 @@ enum Indexer {
         return CGImageDestinationFinalize(dest) ? data as Data : nil
     }
 
+    /// Dispatches to the right processor based on media kind.
+    static func process(_ row: ClipRow, thumbs: ThumbStore) async -> ClipRow {
+        switch row.mediaKind {
+        case .image: return await processImage(row, thumbs: thumbs)
+        case .audio: return await processAudio(row, thumbs: thumbs)
+        case .video: return await processVideo(row, thumbs: thumbs)
+        }
+    }
+
+    static func processImage(_ row: ClipRow, thumbs: ThumbStore) async -> ClipRow {
+        var r = row
+        guard let src = CGImageSourceCreateWithURL(row.url as CFURL, nil) else { r.status = 2; return r }
+        let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] ?? [:]
+        let pw = props[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let ph = props[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let orientation = props[kCGImagePropertyOrientation] as? Int32 ?? 1
+        let rotated = orientation >= 5
+        r.width = rotated ? ph : pw
+        r.height = rotated ? pw : ph
+        let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        if let ds = (exif?[kCGImagePropertyExifDateTimeOriginal] as? String)
+                    ?? (tiff?[kCGImagePropertyTIFFDateTime] as? String) {
+            let fmt = DateFormatter(); fmt.dateFormat = "yyyy:MM:dd HH:mm:ss"
+            r.created = fmt.date(from: ds)?.timeIntervalSince1970 ?? 0
+        }
+        let make = tiff?[kCGImagePropertyTIFFMake] as? String ?? ""
+        let model = tiff?[kCGImagePropertyTIFFModel] as? String ?? ""
+        r.camera = model.hasPrefix(make) || make.isEmpty ? model : (model.isEmpty ? make : "\(make) \(model)")
+        let opts: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: 420,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        guard let thumb = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary),
+              let d = jpeg(thumb) else { r.status = 2; return r }
+        try? thumbs.write(cid: r.cid, frames: [d], poster: 0)
+        r.status = 1
+        return r
+    }
+
+    static func processAudio(_ row: ClipRow, thumbs: ThumbStore) async -> ClipRow {
+        var r = row
+        let asset = AVURLAsset(url: row.url)
+        do {
+            let dur = try await asset.load(.duration).seconds
+            guard dur.isFinite, dur > 0 else { r.status = 2; return r }
+            r.duration = dur
+            let meta = (try? await asset.load(.commonMetadata)) ?? []
+            func str(_ id: AVMetadataIdentifier) async -> String {
+                let items = AVMetadataItem.metadataItems(from: meta, filteredByIdentifier: id)
+                guard let it = items.first, let s = try? await it.load(.stringValue) else { return "" }
+                return s
+            }
+            let make = await str(.commonIdentifierMake), model = await str(.commonIdentifierModel)
+            r.camera = model.hasPrefix(make) || make.isEmpty ? model : (model.isEmpty ? make : "\(make) \(model)")
+            if let item = try? await asset.load(.creationDate), let d = try? await item.load(.dateValue) {
+                r.created = d.timeIntervalSince1970
+            }
+            if let tracks = try? await asset.loadTracks(withMediaType: .audio),
+               let fd = try? await tracks.first?.load(.formatDescriptions).first {
+                r.codec = fourCC(CMFormatDescriptionGetMediaSubType(fd))
+            }
+            r.status = 1
+        } catch { r.status = 2 }
+        return r
+    }
+
     /// Reads metadata and writes the packed thumbnails. Returns the row with status 1 (ready) or 2 (failed).
     /// Returns status 0 if cancelled so it is retried next time.
-    static func process(_ row: ClipRow, thumbs: ThumbStore) async -> ClipRow {
+    static func processVideo(_ row: ClipRow, thumbs: ThumbStore) async -> ClipRow {
         var r = row
         let asset = AVURLAsset(url: row.url)
         do {

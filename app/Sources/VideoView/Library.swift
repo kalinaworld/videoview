@@ -288,7 +288,7 @@ final class Library {
             let v = try? u.resourceValues(forKeys: Set(keys))
             if v?.isDirectory == true {
                 if v?.isPackage != true { subdirs.append(u.path) }   // skips .app, Photos and Final Cut libraries
-            } else if Indexer.videoExts.contains(u.pathExtension.lowercased()) {
+            } else if Indexer.allExts.contains(u.pathExtension.lowercased()) {
                 files.append(.init(path: u.path, size: Int64(v?.fileSize ?? 0),
                                    mtime: v?.contentModificationDate?.timeIntervalSince1970 ?? 0))
             }
@@ -352,7 +352,8 @@ final class Library {
         let parentDir = (dir as NSString).deletingLastPathComponent
         if treeKids[parentDir] != nil { loadKids(parentDir, force: true) }
 
-        let todo = rows.filter { $0.status != 1 || !thumbs.exists($0.cid) }
+        // Audio has no thumb pack; only check thumbs.exists for video and image.
+        let todo = rows.filter { $0.status != 1 || ($0.mediaKind != .audio && !thumbs.exists($0.cid)) }
         progressTotal = todo.count
         progressDone = 0
         guard !todo.isEmpty else {
