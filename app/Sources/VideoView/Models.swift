@@ -126,6 +126,14 @@ enum DuplicateFilter: Hashable {
     case off, exact, similar, any
 }
 
+enum MediaKindFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case video = "Video"
+    case image = "Photos"
+    case audio = "Audio"
+    var id: String { rawValue }
+}
+
 enum MediaKind { case video, image, audio }
 
 extension ClipRow {

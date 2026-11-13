@@ -40,6 +40,15 @@ struct ContentView: View {
                 .pickerStyle(.menu)
             }
             ToolbarItem {
+                Picker("Media", selection: $lib.mediaKindFilter) {
+                    ForEach(MediaKindFilter.allCases) { kind in
+                        Text(kind.rawValue).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .help("Show all media, video only, photos only, or audio only")
+            }
+            ToolbarItem {
                 Picker("Camera", selection: $lib.cameraFilter) {
                     Text("All cameras").tag(String?.none)
                     ForEach(lib.cameras, id: \.self) { Text($0).tag(String?.some($0)) }

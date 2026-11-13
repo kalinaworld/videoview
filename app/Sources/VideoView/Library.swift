@@ -39,6 +39,7 @@ final class Library {
     var duplicateCids: Set<String> = []          // exact copies: same content id in more than one place
     var similarMap: [String: [String]] = [:]     // look-alikes (re-encodes, trimmed copies): content id to other content ids
     var duplicateFilter: DuplicateFilter = .off
+    var mediaKindFilter: MediaKindFilter = .all
     @ObservationIgnored private var similarTask: Task<Void, Never>?
     @ObservationIgnored private var similarSignature = -1
     var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .minimal {
@@ -129,6 +130,12 @@ final class Library {
         case .color(let c): list = list.filter { flagColors[$0.cid] == c }
         }
         if let cam = cameraFilter { list = list.filter { $0.camera == cam } }
+        switch mediaKindFilter {
+        case .all: break
+        case .video: list = list.filter { $0.mediaKind == .video }
+        case .image: list = list.filter { $0.mediaKind == .image }
+        case .audio: list = list.filter { $0.mediaKind == .audio }
+        }
         switch duplicateFilter {
         case .off: break
         case .exact: list = list.filter { duplicateCids.contains($0.cid) }

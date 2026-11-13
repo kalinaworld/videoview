@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 
 /// Identifies files and extracts metadata plus small frames. Never writes to a clip.
 enum Indexer {
-    static let videoExts: Set<String> = ["mov", "mp4", "m4v", "mts", "m2ts", "3gp"]
+    static let videoExts: Set<String> = ["mov", "mp4", "m4v", "mts", "m2ts", "3gp", "qta"]
     static let imageExts: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "tif",
                                           "gif", "bmp", "webp", "dng", "arw", "nef", "cr2", "cr3",
                                           "raf", "orf", "rw2", "pef", "raw"]
