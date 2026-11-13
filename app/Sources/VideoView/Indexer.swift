@@ -7,11 +7,11 @@ import UniformTypeIdentifiers
 
 /// Identifies files and extracts metadata plus small frames. Never writes to a clip.
 enum Indexer {
-    static let videoExts: Set<String> = ["mov", "mp4", "m4v", "mts", "m2ts", "3gp", "qta"]
+    static let videoExts: Set<String> = ["mov", "mp4", "m4v", "mts", "m2ts", "3gp"]
     static let imageExts: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "tif",
                                           "gif", "bmp", "webp", "dng", "arw", "nef", "cr2", "cr3",
                                           "raf", "orf", "rw2", "pef", "raw"]
-    static let audioExts: Set<String> = ["mp3", "m4a", "aiff", "aif", "wav", "flac", "aac", "caf"]
+    static let audioExts: Set<String> = ["mp3", "m4a", "aiff", "aif", "wav", "flac", "aac", "caf", "qta"]
     static var allExts: Set<String> { videoExts.union(imageExts).union(audioExts) }
 
     /// Content id: file size plus the first and last 64 KB. Cheap on the NAS, survives renames and moves.
