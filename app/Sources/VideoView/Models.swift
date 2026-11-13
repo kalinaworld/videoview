@@ -144,8 +144,7 @@ func formatShotDate(_ t: Double) -> String {
     let d = Date(timeIntervalSince1970: t)
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US")
-    f.dateFormat = Calendar.current.component(.year, from: d) == Calendar.current.component(.year, from: Date())
-        ? "MMM d" : "MMM d, yyyy"
+    f.dateFormat = "MMM d, yyyy"
     return f.string(from: d)
 }
 

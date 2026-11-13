@@ -51,6 +51,7 @@ struct ClipCard: View {
                         Image(nsImage: img).resizable().scaledToFit()
                     } else if clip.mediaKind == .audio {
                         Image(systemName: "music.note").font(.system(size: 36)).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if clip.status == 2 {
                         Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
                     } else {
