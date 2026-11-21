@@ -21,6 +21,7 @@ A native macOS app (SwiftUI, SwiftPM, macOS 15+) for browsing, trimming and tidy
 - Replacing or trashing an original is a separate, explicit user step, and goes to Trash, never a hard delete.
 - Files the trimmer does not support (fragmented, multiple mdat, edit list rate != 1) are refused, not guessed at.
 - Flags and other user data live in the index DB keyed by content id, so they follow moved and renamed clips.
+- "Looks similar" (`Similarity.swift`) is a hint for Noah to check. Nothing may trash, replace or merge clips based on it automatically.
 
 ## Status
 Shipped: browse grid with cached posters and hover scrub, player (J/K/L), lossless trim with verification, delete to Trash after verified trim, color flags (orange/red/green/blue) with filter, camera filter and sort, Finder-style folder browsing and sidebar tree, move/new folder/rename, justified grid for vertical clips, Control Room card, Minimal/Info view toggle, army green accent, bitrate pill and HEVC savings on cards, Space Saver (HEVC re-encode with presets, sample preview, verification), app design pass, date shot on cards, Reveal in Finder on sidebar and folder cards, grid keyboard navigation (arrow keys + Space), duplicates check (badge on cards + toolbar filter toggle).
