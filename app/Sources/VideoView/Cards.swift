@@ -54,8 +54,10 @@ struct ClipCard: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if clip.status == 2 {
                         Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ProgressView().controlSize(.small)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     if let f = hoverFraction, clip.mediaKind == .video {
                         GeometryReader { g in
